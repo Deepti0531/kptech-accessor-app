@@ -1,15 +1,21 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
+
+import Screen from "../../components/common/Screen";
+import AppButton from "../../components/common/AppButton";
+import AppInput from "../../components/common/AppInput";
 
 export default function DashboardScreen() {
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <Text>Dashboard</Text>
-    </View>
+    <Screen>
+      <AppInput
+        label="Username"
+        placeholder="Enter username"
+      />
+
+      <AppButton
+        title="Test Button"
+        onPress={() => console.log("Pressed")}
+      />
+    </Screen>
   );
 }
