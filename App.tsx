@@ -1,5 +1,10 @@
 import AppNavigator from "./src/navigation/AppNavigator";
+import { AssessmentProvider } from "./src/context/AssessmentContext";
 
 export default function App() {
-  return <AppNavigator />;
+  return (
+    <AssessmentProvider>
+      <AppNavigator />
+    </AssessmentProvider>
+  );
 }

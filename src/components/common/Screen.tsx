@@ -4,8 +4,6 @@ import {
   Platform,
   StyleSheet,
   View,
-  TouchableWithoutFeedback,
-  Keyboard,
 } from "react-native";
 import { Colors} from "../../theme/colors";
 import { Spacing } from "../../theme/spacing";
@@ -18,9 +16,6 @@ type ScreenProps = {
 export default function Screen({ children }: ScreenProps) {
   return (
   <SafeAreaView style={styles.safeArea}>
-  <TouchableWithoutFeedback
-    onPress={Keyboard.dismiss}
-  >
     <KeyboardAvoidingView
       style={styles.keyboard}
       behavior={
@@ -33,7 +28,6 @@ export default function Screen({ children }: ScreenProps) {
         {children}
       </View>
     </KeyboardAvoidingView>
-  </TouchableWithoutFeedback>
 </SafeAreaView>
   );
 }

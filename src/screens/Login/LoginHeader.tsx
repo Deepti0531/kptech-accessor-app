@@ -13,12 +13,7 @@ export default function LoginHeader() {
       </View>
 
       <Text style={styles.title}>
-        Assessment Management Platform
-      </Text>
-
-      <Text style={styles.subtitle}>
-        Assessor Mobile Application
-      </Text>
+        Kp Tech Assessor Portal</Text>
     </View>
   );
 }

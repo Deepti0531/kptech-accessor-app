@@ -12,24 +12,29 @@ type AppButtonProps = {
   title: string;
   onPress: () => void;
   loading?: boolean;
+  disabled?: boolean;
 };
 
 export default function AppButton({
   title,
   onPress,
   loading = false,
+  disabled = false,
 }: AppButtonProps) {
   return (
     <TouchableOpacity
-      style={styles.button}
+      style={[
+  styles.button,
+  (loading || disabled) && styles.buttonDisabled,
+]}
       onPress={onPress}
-      disabled={loading}
+      disabled={loading || disabled}
     >
       {loading ? (
-        <ActivityIndicator color={Colors.white} />
-      ) : (
-        <Text style={styles.text}>{title}</Text>
-      )}
+ <ActivityIndicator color={Colors.white} />
+) : (
+  <Text style={styles.text}>{title}</Text>
+)}
     </TouchableOpacity>
   );
 }
@@ -48,4 +53,7 @@ button: {
     fontWeight: "600",
     fontSize: 16,
   },
+  buttonDisabled: {
+  opacity: 0.6,
+},
 });

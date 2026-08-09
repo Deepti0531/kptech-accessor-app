@@ -1,18 +1,25 @@
 import { ReactNode } from "react";
-import { StyleSheet, View } from "react-native";
+import {
+  StyleSheet,
+  View,
+  ViewStyle,
+  StyleProp,
+} from "react-native";
 
-import { Colors} from "../../theme/colors";
-import { Spacing} from "../../theme/spacing";
+import { Colors } from "../../theme/colors";
+import { Spacing } from "../../theme/spacing";
 
 type AppCardProps = {
   children: ReactNode;
+  style?: StyleProp<ViewStyle>;
 };
 
 export default function AppCard({
   children,
+  style,
 }: AppCardProps) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, style]}>
       {children}
     </View>
   );
