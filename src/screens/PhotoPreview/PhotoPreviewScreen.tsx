@@ -16,7 +16,7 @@ import { Typography } from "../../theme/typography";
 
 import { RootStackParamList } from "../../navigation/AppNavigator";
 import { useAssessment } from "../../context/AssessmentContext";
-import { submitArrivalVerification } from "../../services/assessments/arrivalVerificationApi";
+import { submitArrivalVerification, submitCenterVerificationPhoto } from "../../services/assessments/arrivalVerificationApi";
 
 type NavigationProp =
   NativeStackNavigationProp<RootStackParamList>;
@@ -47,7 +47,7 @@ export default function PhotoPreviewScreen() {
   } = route.params;
 
   const handleUsePhoto = async () => {
-    if (verificationType !== "arrival") {
+    if (!["arrival", "centre", "infrastructure"].includes(verificationType)) {
       // Every other verification type is still local-only mock state
       // (Phase 2) — unchanged behavior.
       addPhoto(verificationType, photoIndex, photoUri);
@@ -58,20 +58,29 @@ export default function PhotoPreviewScreen() {
 
     setSubmitting(true);
     try {
-      await submitArrivalVerification({
-        batchId: Number(assessmentId),
-        photoUri,
-        latitude,
-        longitude,
-        accuracy,
-      });
+      if (verificationType === "arrival") {
+        await submitArrivalVerification({
+          batchId: Number(assessmentId),
+          photoUri,
+          latitude,
+          longitude,
+          accuracy,
+        });
+      } else {
+        await submitCenterVerificationPhoto({
+          batchId: Number(assessmentId),
+          photoUri,
+          verificationType,
+          photoIndex,
+        });
+      }
       addPhoto(verificationType, photoIndex, photoUri);
       navigation.goBack(); // Back to Camera
       navigation.goBack(); // Back to Verification Photos
     } catch (error) {
       Alert.alert(
         "Upload failed",
-        "Couldn't save the arrival photo. Check your connection and try again."
+        "Couldn't save the verification photo. Check your connection and try again."
       );
     } finally {
       setSubmitting(false);

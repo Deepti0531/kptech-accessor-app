@@ -1,4 +1,5 @@
 import { api } from "../api";
+import { VerificationType } from "../../types/assessment";
 
 interface SubmitArrivalVerificationParams {
   batchId: number;
@@ -15,6 +16,11 @@ export interface ArrivalVerification {
   longitude: number | null;
   accuracy_m: number | null;
   captured_at: string;
+}
+
+interface SubmitCenterVerificationPhotoParams extends SubmitArrivalVerificationParams {
+  verificationType: VerificationType;
+  photoIndex: number;
 }
 
 // POST /assessor/center-verification/arrival — multipart, matching
@@ -43,6 +49,37 @@ export async function submitArrivalVerification({
 
   const response = await api.post<ArrivalVerification>(
     "/assessor/center-verification/arrival",
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+  return response.data;
+}
+
+export async function submitCenterVerificationPhoto({
+  batchId,
+  photoUri,
+  verificationType,
+  photoIndex,
+  latitude,
+  longitude,
+  accuracy,
+}: SubmitCenterVerificationPhotoParams): Promise<ArrivalVerification> {
+  const formData = new FormData();
+  formData.append("batch_id", String(batchId));
+  formData.append("verification_type", verificationType);
+  formData.append("photo_index", String(photoIndex));
+  if (latitude !== undefined) formData.append("latitude", String(latitude));
+  if (longitude !== undefined) formData.append("longitude", String(longitude));
+  if (accuracy !== undefined) formData.append("accuracy_m", String(accuracy));
+
+  formData.append("file", {
+    uri: photoUri,
+    name: `${verificationType}-${photoIndex + 1}.jpg`,
+    type: "image/jpeg",
+  } as unknown as Blob);
+
+  const response = await api.post<ArrivalVerification>(
+    "/assessor/center-verification/photo",
     formData,
     { headers: { "Content-Type": "multipart/form-data" } }
   );
