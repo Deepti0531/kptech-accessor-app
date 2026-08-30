@@ -33,6 +33,7 @@ export default function CameraCaptureScreen() {
   assessmentId,
   verificationType,
   photoIndex,
+  studentId,
 } = route.params;
 
   const [permission, requestPermission] =
@@ -69,6 +70,7 @@ export default function CameraCaptureScreen() {
   try {
     const photo = await cameraRef.current.takePictureAsync({
       quality: 0.8,
+      shutterSound: false,
     });
 
     if (!photo?.uri) {
@@ -107,6 +109,7 @@ navigation.navigate("PhotoPreview", {
   latitude,
   longitude,
   accuracy,
+  studentId,
 });
 
   } catch (error) {

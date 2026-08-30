@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
 import { useVideoPlayer, VideoView } from "expo-video";
 
 import {
@@ -17,6 +18,7 @@ import { Typography } from "../../theme/typography";
 
 import { RootStackParamList } from "../../navigation/AppNavigator";
 import { useAssessment } from "../../context/AssessmentContext";
+import { submitVivaEvidence } from "../../services/assessments/assessorSubmissionsApi";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -30,6 +32,7 @@ export default function VivaClipPreviewScreen() {
   const route = useRoute<PreviewRouteProp>();
 
   const { addVivaClip } = useAssessment();
+  const [submitting, setSubmitting] = useState(false);
 
   const {
     assessmentId,
@@ -41,23 +44,45 @@ export default function VivaClipPreviewScreen() {
 
   const player = useVideoPlayer(videoUri);
 
-  const handleUseRecording = () => {
-    addVivaClip(studentId, roundId, speaker, videoUri);
+  const handleDelete = () => {
+    navigation.goBack();
+    navigation.goBack();
+  };
 
-    if (speaker === "question") {
-      // Move straight on to recording the student's answer.
-      navigation.replace("VivaRecording", {
-        assessmentId,
-        studentId,
+  const handleUseRecording = async () => {
+    setSubmitting(true);
+    try {
+      const saved = await submitVivaEvidence({
+        batchId: Number(assessmentId),
+        studentId: Number(studentId),
         roundId,
-        speaker: "answer",
+        speaker,
+        videoUri,
       });
-    } else {
-      // Back to Camera
-      navigation.goBack();
+      addVivaClip(studentId, roundId, speaker, videoUri, String(saved.id));
 
-      // Back to Viva Rounds
-      navigation.goBack();
+      if (speaker === "question") {
+        // Move straight on to recording the student's answer.
+        navigation.replace("VivaRecording", {
+          assessmentId,
+          studentId,
+          roundId,
+          speaker: "answer",
+        });
+      } else {
+        // Back to Camera
+        navigation.goBack();
+
+        // Back to Viva Rounds
+        navigation.goBack();
+      }
+    } catch {
+      Alert.alert(
+        "Upload failed",
+        "Couldn't save the viva recording. Check your connection and try again."
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -76,14 +101,24 @@ export default function VivaClipPreviewScreen() {
       <View style={styles.actions}>
         <View style={styles.buttonContainer}>
           <AppButton
+            title="Delete"
+            disabled={submitting}
+            onPress={handleDelete}
+          />
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <AppButton
             title="Retake"
+            disabled={submitting}
             onPress={() => navigation.goBack()}
           />
         </View>
 
         <View style={styles.buttonContainer}>
           <AppButton
-            title="Use Recording"
+            title="Upload"
+            loading={submitting}
             onPress={handleUseRecording}
           />
         </View>

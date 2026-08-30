@@ -1,4 +1,4 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, StyleSheet, Text, View } from "react-native";
 import { useVideoPlayer, VideoView } from "expo-video";
 
 import {
@@ -14,6 +14,7 @@ import AppButton from "../../../components/common/AppButton";
 
 import { RootStackParamList } from "../../../navigation/AppNavigator";
 import { useAssessment } from "../../../context/AssessmentContext";
+import { deletePracticalEvidence as deletePracticalEvidenceUpload } from "../../../services/assessments/assessorSubmissionsApi";
 
 import { Colors } from "../../../theme/colors";
 import { Spacing } from "../../../theme/spacing";
@@ -72,9 +73,17 @@ export default function PracticalEvidenceViewerScreen() {
       <View style={styles.row}>
         <AppButton
           title="Delete"
-          onPress={() => {
-            deletePracticalEvidence(studentId, evidenceId);
-            navigation.goBack();
+          onPress={async () => {
+            try {
+              await deletePracticalEvidenceUpload(Number(evidenceId));
+              deletePracticalEvidence(studentId, evidenceId);
+              navigation.goBack();
+            } catch {
+              Alert.alert(
+                "Delete failed",
+                "Couldn't delete the practical evidence. Check your connection and try again."
+              );
+            }
           }}
         />
       </View>

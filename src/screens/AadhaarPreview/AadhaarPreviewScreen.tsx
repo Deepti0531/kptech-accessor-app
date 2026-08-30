@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View, Image } from "react-native";
+import { Alert, StyleSheet, Text, View, Image } from "react-native";
+import { useState } from "react";
 import {
   useNavigation,
   useRoute,
@@ -15,6 +16,7 @@ import { Typography } from "../../theme/typography";
 
 import { RootStackParamList } from "../../navigation/AppNavigator";
 import { useAssessment } from "../../context/AssessmentContext";
+import { submitAadhaarPhoto } from "../../services/assessments/assessorSubmissionsApi";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -25,17 +27,38 @@ export default function AadhaarPreviewScreen() {
   const route = useRoute<PreviewRouteProp>();
 
   const { addAadhaarPhoto } = useAssessment();
+  const [submitting, setSubmitting] = useState(false);
 
-  const { studentId, photoUri } = route.params;
+  const { assessmentId, studentId, photoUri } = route.params;
 
-  const handleUsePhoto = () => {
-    addAadhaarPhoto(studentId, photoUri);
-
-    // Back to Camera
+  const handleDelete = () => {
     navigation.goBack();
-
-    // Back to Student Attendance
     navigation.goBack();
+  };
+
+  const handleUsePhoto = async () => {
+    setSubmitting(true);
+    try {
+      await submitAadhaarPhoto({
+        batchId: Number(assessmentId),
+        studentId: Number(studentId),
+        photoUri,
+      });
+      addAadhaarPhoto(studentId, photoUri);
+
+      // Back to Camera
+      navigation.goBack();
+
+      // Back to Student Attendance
+      navigation.goBack();
+    } catch {
+      Alert.alert(
+        "Upload failed",
+        "Couldn't save the Aadhaar photo. Check your connection and try again."
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -52,14 +75,24 @@ export default function AadhaarPreviewScreen() {
       <View style={styles.actions}>
         <View style={styles.buttonContainer}>
           <AppButton
+            title="Delete"
+            disabled={submitting}
+            onPress={handleDelete}
+          />
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <AppButton
             title="Retake"
+            disabled={submitting}
             onPress={() => navigation.goBack()}
           />
         </View>
 
         <View style={styles.buttonContainer}>
           <AppButton
-            title="Use Photo"
+            title="Upload"
+            loading={submitting}
             onPress={handleUsePhoto}
           />
         </View>

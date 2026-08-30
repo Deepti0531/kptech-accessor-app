@@ -12,7 +12,7 @@ import AppButton from "../../../components/common/AppButton";
 import VivaRoundCard from "../../../components/viva/VivaRoundCard";
 
 import { useAssessment } from "../../../context/AssessmentContext";
-import { students } from "../../../data/studentsData";
+import { useAssignedBatchStudents } from "../../../hooks/useAssignedBatchStudents";
 
 import { RootStackParamList } from "../../../navigation/AppNavigator";
 
@@ -33,12 +33,20 @@ export default function VivaStudentRoundsScreen() {
 
   const { assessment } = useAssessment();
   const { assessmentId, studentId } = route.params;
+  const {
+    students,
+    loading,
+  } = useAssignedBatchStudents(assessmentId);
 
   const student = students.find((item) => item.id === studentId);
 
   const record = assessment.viva.records.find(
     (item) => item.studentId === studentId
   );
+  const attendanceRecord = assessment.attendance.records.find(
+    (item) => item.studentId === studentId
+  );
+  const isAbsent = attendanceRecord?.status === "Absent";
 
   const rounds = record?.rounds ?? [];
 
@@ -50,13 +58,21 @@ export default function VivaStudentRoundsScreen() {
         contentContainerStyle={styles.container}
       >
         <Text style={styles.title}>
-          {student?.name ?? "Viva Assessment"}
+          {loading
+            ? "Loading student..."
+            : student?.name ?? "Viva Assessment"}
         </Text>
 
         <Text style={styles.subtitle}>
           {student?.rollNumber} • Record the accessor's question, then
           the student's answer, for each round.
         </Text>
+
+        {isAbsent && (
+          <Text style={styles.absentNotice}>
+            Student is absent. Viva recording is not required.
+          </Text>
+        )}
 
         {rounds.length === 0 ? (
           <Text style={styles.emptyText}>
@@ -69,6 +85,7 @@ export default function VivaStudentRoundsScreen() {
               roundNumber={index + 1}
               hasQuestionClip={!!round.questionClip}
               hasAnswerClip={!!round.answerClip}
+              recordDisabled={isAbsent}
               onRecordQuestion={() =>
                 navigation.navigate("VivaRecording", {
                   assessmentId,
@@ -107,6 +124,7 @@ export default function VivaStudentRoundsScreen() {
 
         <AppButton
           title="Start New Question"
+          disabled={isAbsent}
           onPress={() => {
             const roundId = Date.now().toString();
 
@@ -117,6 +135,12 @@ export default function VivaStudentRoundsScreen() {
               speaker: "question",
             });
           }}
+        />
+
+        <AppButton
+          title="Back to Students"
+          variant="secondary"
+          onPress={() => navigation.goBack()}
         />
       </ScrollView>
     </Screen>
@@ -150,5 +174,12 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center",
     marginVertical: Spacing.xl,
+  },
+
+  absentNotice: {
+    fontSize: Typography.body,
+    color: Colors.error,
+    fontWeight: "700",
+    textAlign: "center",
   },
 });

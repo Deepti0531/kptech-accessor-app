@@ -18,7 +18,9 @@ export interface ArrivalVerification {
   captured_at: string;
 }
 
-interface SubmitCenterVerificationPhotoParams extends SubmitArrivalVerificationParams {
+interface SubmitCenterVerificationPhotoParams {
+  batchId: number;
+  photoUri: string;
   verificationType: VerificationType;
   photoIndex: number;
 }
@@ -60,17 +62,11 @@ export async function submitCenterVerificationPhoto({
   photoUri,
   verificationType,
   photoIndex,
-  latitude,
-  longitude,
-  accuracy,
 }: SubmitCenterVerificationPhotoParams): Promise<ArrivalVerification> {
   const formData = new FormData();
   formData.append("batch_id", String(batchId));
   formData.append("verification_type", verificationType);
   formData.append("photo_index", String(photoIndex));
-  if (latitude !== undefined) formData.append("latitude", String(latitude));
-  if (longitude !== undefined) formData.append("longitude", String(longitude));
-  if (accuracy !== undefined) formData.append("accuracy_m", String(accuracy));
 
   formData.append("file", {
     uri: photoUri,
@@ -84,4 +80,22 @@ export async function submitCenterVerificationPhoto({
     { headers: { "Content-Type": "multipart/form-data" } }
   );
   return response.data;
+}
+
+export async function deleteCenterVerificationPhoto({
+  batchId,
+  verificationType,
+  photoIndex,
+}: {
+  batchId: number;
+  verificationType: VerificationType;
+  photoIndex: number;
+}): Promise<void> {
+  await api.delete("/assessor/center-verification/photo", {
+    params: {
+      batch_id: batchId,
+      verification_type: verificationType,
+      photo_index: photoIndex,
+    },
+  });
 }

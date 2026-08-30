@@ -13,6 +13,7 @@ type AppButtonProps = {
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
+  variant?: "primary" | "secondary" | "danger";
 };
 
 export default function AppButton({
@@ -20,40 +21,67 @@ export default function AppButton({
   onPress,
   loading = false,
   disabled = false,
+  variant = "primary",
 }: AppButtonProps) {
   return (
     <TouchableOpacity
       style={[
-  styles.button,
-  (loading || disabled) && styles.buttonDisabled,
-]}
+        styles.button,
+        styles[variant],
+        (loading || disabled) && styles.buttonDisabled,
+      ]}
       onPress={onPress}
       disabled={loading || disabled}
     >
       {loading ? (
- <ActivityIndicator color={Colors.white} />
-) : (
-  <Text style={styles.text}>{title}</Text>
-)}
+        <ActivityIndicator color={Colors.white} />
+      ) : (
+        <Text
+          style={[
+            styles.text,
+            variant === "secondary" && styles.secondaryText,
+          ]}
+        >
+          {title}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-button: {
+  button: {
     width: "100%",
-    backgroundColor: Colors.primary,
     padding: Spacing.md,
     borderRadius: 10,
     alignItems: "center",
-},
+  },
+
+  primary: {
+    backgroundColor: Colors.primary,
+  },
+
+  secondary: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
+  danger: {
+    backgroundColor: Colors.error,
+  },
 
   text: {
     color: Colors.white,
     fontWeight: "600",
     fontSize: 16,
   },
+
+  secondaryText: {
+    color: Colors.textPrimary,
+  },
+
   buttonDisabled: {
-  opacity: 0.6,
-},
+    opacity: 0.6,
+  },
 });

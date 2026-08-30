@@ -1,6 +1,10 @@
-import { ScrollView, StyleSheet, Text } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text } from "react-native";
 
-import { useNavigation } from "@react-navigation/native";
+import {
+  RouteProp,
+  useNavigation,
+  useRoute,
+} from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import Screen from "../../components/common/Screen";
@@ -9,7 +13,8 @@ import VerificationProgress from "../../components/verification/VerificationProg
 import AppButton from "../../components/common/AppButton";
 
 import { useAssessment } from "../../context/AssessmentContext";
-import { students } from "../../data/studentsData";
+import { useAssignedBatchStudents } from "../../hooks/useAssignedBatchStudents";
+import { markStudentAttendance } from "../../services/assessments/assessorSubmissionsApi";
 
 import { RootStackParamList } from "../../navigation/AppNavigator";
 
@@ -18,27 +23,59 @@ import { Spacing } from "../../theme/spacing";
 import { Typography } from "../../theme/typography";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type RouteProps = RouteProp<RootStackParamList, "StudentAttendance">;
 
 export default function StudentAttendanceScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProps>();
   const { assessment, markAttendance } = useAssessment();
+  const { assessmentId } = route.params;
+  const {
+    students,
+    loading,
+    error,
+  } = useAssignedBatchStudents(assessmentId);
 
-  const markedCount = assessment.attendance.records.filter(
+  const studentIds = new Set(students.map((student) => student.id));
+  const records = assessment.attendance.records.filter((record) =>
+    studentIds.has(record.studentId)
+  );
+
+  const markedCount = records.filter(
     (record) => record.status !== "Not Marked"
   ).length;
 
-  const verifiedCount = assessment.attendance.records.filter(
+  const verifiedCount = records.filter(
     (record) =>
       record.status === "Present" && record.aadhaarPhoto !== undefined
   ).length;
 
-  const presentCount = assessment.attendance.records.filter(
+  const presentCount = records.filter(
     (record) => record.status === "Present"
   ).length;
 
-  const allMarked = markedCount === students.length;
+  const allMarked = students.length > 0 && markedCount === students.length;
   const allPresentVerified = verifiedCount === presentCount;
   const canContinue = allMarked && allPresentVerified;
+
+  const handleMarkAttendance = async (
+    studentId: string,
+    status: "Present" | "Absent"
+  ) => {
+    try {
+      await markStudentAttendance({
+        batchId: Number(assessmentId),
+        studentId: Number(studentId),
+        status,
+      });
+      markAttendance(studentId, status);
+    } catch {
+      Alert.alert(
+        "Could not save attendance",
+        "Check your connection and try again."
+      );
+    }
+  };
 
   return (
     <Screen>
@@ -55,40 +92,50 @@ export default function StudentAttendanceScreen() {
           Mark attendance and verify Aadhaar for every present student.
         </Text>
 
-        {students.map((student) => {
-          const record = assessment.attendance.records.find(
-            (item) => item.studentId === student.id
-          );
+        {loading ? (
+          <Text style={styles.emptyText}>Loading students...</Text>
+        ) : error ? (
+          <Text style={styles.emptyText}>{error}</Text>
+        ) : students.length === 0 ? (
+          <Text style={styles.emptyText}>
+            No students found for this batch.
+          </Text>
+        ) : (
+          students.map((student) => {
+            const record = records.find(
+              (item) => item.studentId === student.id
+            );
 
-          const status = record?.status ?? "Not Marked";
-          const aadhaarVerified = record?.aadhaarPhoto !== undefined;
+            const status = record?.status ?? "Not Marked";
+            const aadhaarVerified = record?.aadhaarPhoto !== undefined;
 
-          return (
-            <StudentAttendanceItem
-              key={student.id}
-              name={student.name}
-              rollNumber={student.rollNumber}
-              aadhaarNumber={student.aadhaarNumber}
-              status={status}
-              aadhaarVerified={aadhaarVerified}
-              onMarkPresent={() =>
-                markAttendance(student.id, "Present")
-              }
-              onMarkAbsent={() =>
-                markAttendance(student.id, "Absent")
-              }
-              onVerifyAadhaar={() =>
-                navigation.navigate(
-                  aadhaarVerified ? "AadhaarDetails" : "AadhaarCapture",
-                  {
-                    assessmentId: assessment.id,
-                    studentId: student.id,
-                  }
-                )
-              }
-            />
-          );
-        })}
+            return (
+              <StudentAttendanceItem
+                key={student.id}
+                name={student.name}
+                rollNumber={student.rollNumber}
+                aadhaarNumber={student.aadhaarNumber}
+                status={status}
+                aadhaarVerified={aadhaarVerified}
+                onMarkPresent={() => {
+                  void handleMarkAttendance(student.id, "Present");
+                }}
+                onMarkAbsent={() => {
+                  void handleMarkAttendance(student.id, "Absent");
+                }}
+                onVerifyAadhaar={() =>
+                  navigation.navigate(
+                    aadhaarVerified ? "AadhaarDetails" : "AadhaarCapture",
+                    {
+                      assessmentId,
+                      studentId: student.id,
+                    }
+                  )
+                }
+              />
+            );
+          })
+        )}
 
         <VerificationProgress
           title="Attendance Progress"
@@ -101,7 +148,7 @@ export default function StudentAttendanceScreen() {
           disabled={!canContinue}
           onPress={() => {
             navigation.navigate("PracticalAssessment", {
-              assessmentId: assessment.id,
+              assessmentId,
             });
           }}
         />
@@ -131,5 +178,12 @@ const styles = StyleSheet.create({
     fontSize: Typography.body,
     color: Colors.textSecondary,
     lineHeight: 24,
+  },
+
+  emptyText: {
+    fontSize: Typography.body,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginVertical: Spacing.xl,
   },
 });

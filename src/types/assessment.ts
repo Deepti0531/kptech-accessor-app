@@ -49,6 +49,7 @@ export interface VerificationPhoto {
   id: string;
   uri: string;
   createdAt: string;
+  studentId?: string;
 }
 export interface VerificationSection {
     photos: (VerificationPhoto | undefined)[];

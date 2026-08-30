@@ -16,7 +16,24 @@ export interface AssignedAssessment {
   current_step: number;
 }
 
+export interface AssignedBatchStudent {
+  id: number;
+  full_name: string;
+  father_name: string;
+  aadhaar_number: string;
+  enrollment_id: string;
+}
+
 export async function getAssignedAssessments(): Promise<AssignedAssessment[]> {
   const response = await api.get<AssignedAssessment[]>("/assessor/assessments");
+  return response.data;
+}
+
+export async function getAssignedBatchStudents(
+  batchId: number
+): Promise<AssignedBatchStudent[]> {
+  const response = await api.get<AssignedBatchStudent[]>(
+    `/assessor/batches/${batchId}/students`
+  );
   return response.data;
 }

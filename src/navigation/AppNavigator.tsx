@@ -27,6 +27,7 @@ import VivaClipViewerScreen from "../screens/VivaAssessment/clipViewer/VivaClipV
 import VivaRecordingScreen from "../screens/VivaRecording/VivaRecordingScreen";
 import VivaClipPreviewScreen from "../screens/VivaClipPreview/VivaClipPreviewScreen";
 import DocumentsUploadScreen from "../screens/DocumentsUpload/DocumentsUploadScreen";
+import EvaluationSheetsScreen from "../screens/EvaluationSheets/EvaluationSheetsScreen";
 import FinalSubmissionScreen from "../screens/FinalSubmission/FinalSubmissionScreen";
 
 export type RootStackParamList = {
@@ -44,10 +45,11 @@ export type RootStackParamList = {
     assessmentId: string;
   };
 
-  CameraCapture: {
+CameraCapture: {
   assessmentId: string;
   verificationType: VerificationType;
   photoIndex: number;
+  studentId?: string;
 };
 
 PhotoPreview: {
@@ -61,6 +63,7 @@ PhotoPreview: {
   latitude?: number;
   longitude?: number;
   accuracy?: number;
+  studentId?: string;
 };
   VerificationPhotos: {
   assessmentId: string;
@@ -155,6 +158,10 @@ VivaClipPreview: {
 };
 
 DocumentsUpload: {
+  assessmentId: string;
+};
+
+EvaluationSheets: {
   assessmentId: string;
 };
 
@@ -294,6 +301,11 @@ export default function AppNavigator() {
 <Stack.Screen
   name="DocumentsUpload"
   component={DocumentsUploadScreen}
+/>
+
+<Stack.Screen
+  name="EvaluationSheets"
+  component={EvaluationSheetsScreen}
 />
 
 <Stack.Screen

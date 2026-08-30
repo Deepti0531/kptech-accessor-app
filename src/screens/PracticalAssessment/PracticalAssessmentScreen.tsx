@@ -1,6 +1,10 @@
 import { ScrollView, StyleSheet, Text } from "react-native";
 
-import { useNavigation } from "@react-navigation/native";
+import {
+  RouteProp,
+  useNavigation,
+  useRoute,
+} from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import Screen from "../../components/common/Screen";
@@ -9,7 +13,7 @@ import VerificationProgress from "../../components/verification/VerificationProg
 import AppButton from "../../components/common/AppButton";
 
 import { useAssessment } from "../../context/AssessmentContext";
-import { students } from "../../data/studentsData";
+import { useAssignedBatchStudents } from "../../hooks/useAssignedBatchStudents";
 
 import { RootStackParamList } from "../../navigation/AppNavigator";
 
@@ -18,16 +22,50 @@ import { Spacing } from "../../theme/spacing";
 import { Typography } from "../../theme/typography";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type RouteProps = RouteProp<RootStackParamList, "PracticalAssessment">;
 
 export default function PracticalAssessmentScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProps>();
   const { assessment } = useAssessment();
+  const { assessmentId } = route.params;
+  const {
+    students,
+    loading,
+    error,
+  } = useAssignedBatchStudents(assessmentId);
 
-  const studentsWithEvidence = assessment.practical.records.filter(
-    (record) => record.evidence.length > 0
+  const studentIds = new Set(students.map((student) => student.id));
+  const records = assessment.practical.records.filter((record) =>
+    studentIds.has(record.studentId)
+  );
+  const attendanceRecords = assessment.attendance.records.filter((record) =>
+    studentIds.has(record.studentId)
+  );
+  const absentStudentIds = new Set(
+    attendanceRecords
+      .filter((record) => record.status === "Absent")
+      .map((record) => record.studentId)
+  );
+  const requiredStudentIds = students
+    .filter((student) => !absentStudentIds.has(student.id))
+    .map((student) => student.id);
+  const requiredStudentIdSet = new Set(requiredStudentIds);
+  const sortedStudents = [...students].sort((a, b) => {
+    const aAbsent = absentStudentIds.has(a.id);
+    const bAbsent = absentStudentIds.has(b.id);
+
+    if (aAbsent === bAbsent) return 0;
+    return aAbsent ? 1 : -1;
+  });
+
+  const studentsWithEvidence = records.filter(
+    (record) =>
+      requiredStudentIdSet.has(record.studentId) && record.evidence.length > 0
   ).length;
 
-  const canContinue = studentsWithEvidence === students.length;
+  const canContinue =
+    students.length > 0 && studentsWithEvidence === requiredStudentIds.length;
 
   return (
     <Screen>
@@ -44,31 +82,44 @@ export default function PracticalAssessmentScreen() {
           Upload photo or video evidence of each student's practical work.
         </Text>
 
-        {students.map((student) => {
-          const record = assessment.practical.records.find(
-            (item) => item.studentId === student.id
-          );
+        {loading ? (
+          <Text style={styles.emptyText}>Loading students...</Text>
+        ) : error ? (
+          <Text style={styles.emptyText}>{error}</Text>
+        ) : students.length === 0 ? (
+          <Text style={styles.emptyText}>
+            No students found for this batch.
+          </Text>
+        ) : (
+          sortedStudents.map((student) => {
+            const record = records.find(
+              (item) => item.studentId === student.id
+            );
+            const isAbsent = absentStudentIds.has(student.id);
 
-          return (
-            <StudentEvidenceSummaryItem
-              key={student.id}
-              name={student.name}
-              rollNumber={student.rollNumber}
-              evidenceCount={record?.evidence.length ?? 0}
-              onPress={() =>
-                navigation.navigate("PracticalStudentEvidence", {
-                  assessmentId: assessment.id,
-                  studentId: student.id,
-                })
-              }
-            />
-          );
-        })}
+            return (
+              <StudentEvidenceSummaryItem
+                key={student.id}
+                name={student.name}
+                rollNumber={student.rollNumber}
+                evidenceCount={record?.evidence.length ?? 0}
+                disabled={isAbsent}
+                disabledReason="Absent - evidence not required"
+                onPress={() =>
+                  navigation.navigate("PracticalStudentEvidence", {
+                    assessmentId,
+                    studentId: student.id,
+                  })
+                }
+              />
+            );
+          })
+        )}
 
         <VerificationProgress
           title="Practical Assessment Progress"
           completed={studentsWithEvidence}
-          total={students.length}
+          total={requiredStudentIds.length}
         />
 
         <AppButton
@@ -76,7 +127,7 @@ export default function PracticalAssessmentScreen() {
           disabled={!canContinue}
           onPress={() => {
             navigation.navigate("VivaAssessment", {
-              assessmentId: assessment.id,
+              assessmentId,
             });
           }}
         />
@@ -106,5 +157,12 @@ const styles = StyleSheet.create({
     fontSize: Typography.body,
     color: Colors.textSecondary,
     lineHeight: 24,
+  },
+
+  emptyText: {
+    fontSize: Typography.body,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginVertical: Spacing.xl,
   },
 });

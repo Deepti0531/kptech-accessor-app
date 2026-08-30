@@ -1,4 +1,4 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, StyleSheet, Text, View } from "react-native";
 
 import {
   RouteProp,
@@ -13,7 +13,8 @@ import AppButton from "../../../components/common/AppButton";
 
 import { RootStackParamList } from "../../../navigation/AppNavigator";
 import { useAssessment } from "../../../context/AssessmentContext";
-import { students } from "../../../data/studentsData";
+import { useAssignedBatchStudents } from "../../../hooks/useAssignedBatchStudents";
+import { deleteAadhaarPhoto as deleteAadhaarPhotoUpload } from "../../../services/assessments/assessorSubmissionsApi";
 
 import { Colors } from "../../../theme/colors";
 import { Spacing } from "../../../theme/spacing";
@@ -30,6 +31,10 @@ export default function AadhaarDetailsScreen() {
   const { assessment, deleteAadhaarPhoto } = useAssessment();
 
   const { assessmentId, studentId } = route.params;
+  const {
+    students,
+    loading,
+  } = useAssignedBatchStudents(assessmentId);
 
   const student = students.find((item) => item.id === studentId);
 
@@ -47,7 +52,7 @@ export default function AadhaarDetailsScreen() {
   return (
     <Screen>
       <Text style={styles.title}>
-        {student?.name ?? "Aadhaar Photo"}
+        {loading ? "Loading student..." : student?.name ?? "Aadhaar Photo"}
       </Text>
 
       <Image
@@ -71,9 +76,20 @@ export default function AadhaarDetailsScreen() {
         <View style={styles.button}>
           <AppButton
             title="Delete"
-            onPress={() => {
-              deleteAadhaarPhoto(studentId);
-              navigation.goBack();
+            onPress={async () => {
+              try {
+                await deleteAadhaarPhotoUpload({
+                  batchId: Number(assessmentId),
+                  studentId: Number(studentId),
+                });
+                deleteAadhaarPhoto(studentId);
+                navigation.goBack();
+              } catch {
+                Alert.alert(
+                  "Delete failed",
+                  "Couldn't delete the Aadhaar photo. Check your connection and try again."
+                );
+              }
             }}
           />
         </View>

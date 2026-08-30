@@ -18,6 +18,8 @@ type Props = {
   rollNumber: string;
   completeRounds: number;
   totalRounds: number;
+  disabled?: boolean;
+  disabledReason?: string;
   onPress: () => void;
 };
 
@@ -26,29 +28,40 @@ export default function StudentVivaSummaryItem({
   rollNumber,
   completeRounds,
   totalRounds,
+  disabled = false,
+  disabledReason,
   onPress,
 }: Props) {
   const hasCompleteRound = completeRounds > 0;
 
   return (
-    <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      disabled={disabled}
+      onPress={onPress}
+    >
       <AppCard>
 
-        <View style={styles.container}>
+        <View style={[styles.container, disabled && styles.disabledContainer]}>
 
           <View style={styles.leftSection}>
 
-            <View style={styles.iconContainer}>
+            <View
+              style={[
+                styles.iconContainer,
+                disabled && styles.disabledIconContainer,
+              ]}
+            >
               <Ionicons
-                name="mic-outline"
+                name={disabled ? "ban-outline" : "mic-outline"}
                 size={26}
-                color={Colors.primary}
+                color={disabled ? Colors.textSecondary : Colors.primary}
               />
             </View>
 
             <View style={styles.textSection}>
 
-              <Text style={styles.name}>
+              <Text style={[styles.name, disabled && styles.disabledText]}>
                 {name}
               </Text>
 
@@ -56,7 +69,11 @@ export default function StudentVivaSummaryItem({
                 {rollNumber}
               </Text>
 
-              {hasCompleteRound ? (
+              {disabled ? (
+                <Text style={styles.absentText}>
+                  {disabledReason ?? "Viva not required"}
+                </Text>
+              ) : hasCompleteRound ? (
                 <Text style={styles.completedText}>
                   {completeRounds} of {totalRounds} rounds complete
                 </Text>
@@ -74,11 +91,13 @@ export default function StudentVivaSummaryItem({
 
           </View>
 
-          <Ionicons
-            name="chevron-forward"
-            size={22}
-            color={Colors.textSecondary}
-          />
+          {!disabled && (
+            <Ionicons
+              name="chevron-forward"
+              size={22}
+              color={Colors.textSecondary}
+            />
+          )}
 
         </View>
 
@@ -139,6 +158,25 @@ const styles = StyleSheet.create({
     color: "#16A34A",
     fontWeight: "600",
     fontSize: Typography.caption,
+  },
+
+  absentText: {
+    marginTop: 8,
+    color: Colors.error,
+    fontWeight: "700",
+    fontSize: Typography.caption,
+  },
+
+  disabledContainer: {
+    opacity: 0.55,
+  },
+
+  disabledIconContainer: {
+    backgroundColor: Colors.background,
+  },
+
+  disabledText: {
+    color: Colors.textSecondary,
   },
 
 });

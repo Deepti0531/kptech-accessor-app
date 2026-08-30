@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import {
+  Alert,
   Image,
   StyleSheet,
   Text,
@@ -19,6 +20,8 @@ import AppButton from "../../../components/common/AppButton";
 
 import { RootStackParamList } from "../../../navigation/AppNavigator";
 import { useAssessment } from "../../../context/AssessmentContext";
+import { deleteCenterVerificationPhoto } from "../../../services/assessments/arrivalVerificationApi";
+import { deleteAssessmentDocumentById } from "../../../services/assessments/assessorSubmissionsApi";
 
 import { Colors } from "../../../theme/colors";
 import { Spacing } from "../../../theme/spacing";
@@ -41,6 +44,7 @@ export default function PhotoDetailsScreen() {
     assessment,
     deletePhoto,
   } = useAssessment();
+  const [deleting, setDeleting] = useState(false);
 
   const {
     assessmentId,
@@ -56,6 +60,41 @@ export default function PhotoDetailsScreen() {
     navigation.goBack();
     return null;
   }
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      if (["arrival", "centre", "infrastructure"].includes(verificationType)) {
+        await deleteCenterVerificationPhoto({
+          batchId: Number(assessmentId),
+          verificationType,
+          photoIndex,
+        });
+      } else if (
+        ["attendanceSheet", "evaluationSheet", "assessorDeclaration"].includes(
+          verificationType
+        )
+      ) {
+        const documentId = Number(photo.id);
+        if (Number.isFinite(documentId)) {
+          await deleteAssessmentDocumentById(documentId);
+        }
+      }
+      deletePhoto(
+        verificationType,
+        photoIndex
+      );
+
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert(
+        "Delete failed",
+        "Couldn't delete the verification photo. Check your connection and try again."
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <Screen>
@@ -73,6 +112,7 @@ export default function PhotoDetailsScreen() {
         <View style={styles.button}>
           <AppButton
             title="Replace"
+            disabled={deleting}
             onPress={() =>
               navigation.replace(
                 "CameraCapture",
@@ -80,6 +120,7 @@ export default function PhotoDetailsScreen() {
                   assessmentId,
                   verificationType,
                   photoIndex,
+                  studentId: photo.studentId,
                 }
               )
             }
@@ -89,14 +130,8 @@ export default function PhotoDetailsScreen() {
         <View style={styles.button}>
           <AppButton
             title="Delete"
-            onPress={() => {
-              deletePhoto(
-                verificationType,
-                photoIndex
-              );
-
-              navigation.goBack();
-            }}
+            loading={deleting}
+            onPress={handleDelete}
           />
         </View>
       </View>
