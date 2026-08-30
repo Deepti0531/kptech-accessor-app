@@ -16,8 +16,6 @@ import {
   VivaClip,
 } from "../types/assessment";
 
-import { students } from "../data/studentsData";
-
 interface AssessmentContextType {
   assessment: Assessment;
 
@@ -28,7 +26,9 @@ interface AssessmentContextType {
   addPhoto: (
   type: VerificationType,
   photoIndex: number,
-  photoUri: string
+  photoUri: string,
+  photoId?: string,
+  studentId?: string
 ) => void;
 
   deletePhoto: (
@@ -53,7 +53,8 @@ interface AssessmentContextType {
   addPracticalEvidence: (
     studentId: string,
     type: EvidenceType,
-    uri: string
+    uri: string,
+    evidenceId?: string
   ) => void;
 
   deletePracticalEvidence: (
@@ -65,7 +66,8 @@ interface AssessmentContextType {
     studentId: string,
     roundId: string,
     speaker: VivaSpeaker,
-    uri: string
+    uri: string,
+    clipId?: string
   ) => void;
 
   deleteVivaClip: (
@@ -140,36 +142,30 @@ export function AssessmentProvider({
 },
 
       attendance: {
-        records: students.map((student) => ({
-          studentId: student.id,
-          status: "Not Marked",
-        })),
+        records: [],
       },
 
       practical: {
-        records: students.map((student) => ({
-          studentId: student.id,
-          evidence: [],
-        })),
+        records: [],
       },
 
       viva: {
-        records: students.map((student) => ({
-          studentId: student.id,
-          rounds: [],
-        })),
+        records: [],
       },
     });
 
   const addPhoto = (
     type: VerificationType,
     photoIndex: number,
-    photoUri: string
+    photoUri: string,
+    photoId?: string,
+    studentId?: string
   ) => {
     const newPhoto: VerificationPhoto = {
-      id: Date.now().toString(),
+      id: photoId ?? Date.now().toString(),
       uri: photoUri,
       createdAt: new Date().toISOString(),
+      studentId,
     };
 
     setAssessment((prev) => {
@@ -221,20 +217,38 @@ export function AssessmentProvider({
     studentId: string,
     status: AttendanceStatus
   ) => {
-    setAssessment((prev) => ({
-      ...prev,
-      attendance: {
-        records: prev.attendance.records.map((record) =>
-          record.studentId === studentId
-            ? {
-                ...record,
-                status,
-                markedAt: new Date().toISOString(),
-              }
-            : record
-        ),
-      },
-    }));
+    const markedAt = new Date().toISOString();
+
+    setAssessment((prev) => {
+      const records = prev.attendance.records;
+      const hasRecord = records.some(
+        (record) => record.studentId === studentId
+      );
+
+      return {
+        ...prev,
+        attendance: {
+          records: hasRecord
+            ? records.map((record) =>
+                record.studentId === studentId
+                  ? {
+                      ...record,
+                      status,
+                      markedAt,
+                    }
+                  : record
+              )
+            : [
+                ...records,
+                {
+                  studentId,
+                  status,
+                  markedAt,
+                },
+              ],
+        },
+      };
+    });
   };
 
   const addAadhaarPhoto = (
@@ -247,16 +261,33 @@ export function AssessmentProvider({
       createdAt: new Date().toISOString(),
     };
 
-    setAssessment((prev) => ({
-      ...prev,
-      attendance: {
-        records: prev.attendance.records.map((record) =>
-          record.studentId === studentId
-            ? { ...record, aadhaarPhoto: newPhoto }
-            : record
-        ),
-      },
-    }));
+    setAssessment((prev) => {
+      const records = prev.attendance.records;
+      const hasRecord = records.some(
+        (record) => record.studentId === studentId
+      );
+
+      return {
+        ...prev,
+        attendance: {
+          records: hasRecord
+            ? records.map((record) =>
+                record.studentId === studentId
+                  ? { ...record, aadhaarPhoto: newPhoto }
+                  : record
+              )
+            : [
+                ...records,
+                {
+                  studentId,
+                  status: "Present",
+                  markedAt: new Date().toISOString(),
+                  aadhaarPhoto: newPhoto,
+                },
+              ],
+        },
+      };
+    });
   };
 
   const deleteAadhaarPhoto = (studentId: string) => {
@@ -275,25 +306,44 @@ export function AssessmentProvider({
   const addPracticalEvidence = (
     studentId: string,
     type: EvidenceType,
-    uri: string
+    uri: string,
+    evidenceId?: string
   ) => {
     const newItem: EvidenceItem = {
-      id: Date.now().toString(),
+      id: evidenceId ?? Date.now().toString(),
       type,
       uri,
       createdAt: new Date().toISOString(),
     };
 
-    setAssessment((prev) => ({
-      ...prev,
-      practical: {
-        records: prev.practical.records.map((record) =>
-          record.studentId === studentId
-            ? { ...record, evidence: [...record.evidence, newItem] }
-            : record
-        ),
-      },
-    }));
+    setAssessment((prev) => {
+      const records = prev.practical.records;
+      const hasRecord = records.some(
+        (record) => record.studentId === studentId
+      );
+
+      return {
+        ...prev,
+        practical: {
+          records: hasRecord
+            ? records.map((record) =>
+                record.studentId === studentId
+                  ? {
+                      ...record,
+                      evidence: [...record.evidence, newItem],
+                    }
+                  : record
+              )
+            : [
+                ...records,
+                {
+                  studentId,
+                  evidence: [newItem],
+                },
+              ],
+        },
+      };
+    });
   };
 
   const deletePracticalEvidence = (
@@ -321,10 +371,11 @@ export function AssessmentProvider({
     studentId: string,
     roundId: string,
     speaker: VivaSpeaker,
-    uri: string
+    uri: string,
+    clipId?: string
   ) => {
     const newClip: VivaClip = {
-      id: Date.now().toString(),
+      id: clipId ?? Date.now().toString(),
       speaker,
       uri,
       createdAt: new Date().toISOString(),
@@ -332,10 +383,14 @@ export function AssessmentProvider({
 
     const clipKey = speaker === "question" ? "questionClip" : "answerClip";
 
-    setAssessment((prev) => ({
-      ...prev,
-      viva: {
-        records: prev.viva.records.map((record) => {
+    setAssessment((prev) => {
+      const createdAt = new Date().toISOString();
+      const records = prev.viva.records;
+      const hasRecord = records.some(
+        (record) => record.studentId === studentId
+      );
+
+      const updatedRecords = records.map((record) => {
           if (record.studentId !== studentId) return record;
 
           const existingRound = record.rounds.find(
@@ -349,7 +404,7 @@ export function AssessmentProvider({
                 ...record.rounds,
                 {
                   id: roundId,
-                  createdAt: new Date().toISOString(),
+                  createdAt,
                   [clipKey]: newClip,
                 },
               ],
@@ -364,9 +419,29 @@ export function AssessmentProvider({
                 : round
             ),
           };
-        }),
-      },
-    }));
+        });
+
+      return {
+        ...prev,
+        viva: {
+          records: hasRecord
+            ? updatedRecords
+            : [
+                ...records,
+                {
+                  studentId,
+                  rounds: [
+                    {
+                      id: roundId,
+                      createdAt,
+                      [clipKey]: newClip,
+                    },
+                  ],
+                },
+              ],
+        },
+      };
+    });
   };
 
   const deleteVivaClip = (

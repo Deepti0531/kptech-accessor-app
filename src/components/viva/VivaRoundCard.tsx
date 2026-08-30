@@ -17,11 +17,21 @@ type LegProps = {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   recorded: boolean;
+  recordDisabled?: boolean;
   onRecord: () => void;
   onView: () => void;
 };
 
-function VivaLegRow({ icon, label, recorded, onRecord, onView }: LegProps) {
+function VivaLegRow({
+  icon,
+  label,
+  recorded,
+  recordDisabled = false,
+  onRecord,
+  onView,
+}: LegProps) {
+  const disabled = !recorded && recordDisabled;
+
   return (
     <View style={styles.legRow}>
 
@@ -34,14 +44,20 @@ function VivaLegRow({ icon, label, recorded, onRecord, onView }: LegProps) {
       </View>
 
       <TouchableOpacity
-        style={[styles.legButton, recorded && styles.legButtonRecorded]}
+        style={[
+          styles.legButton,
+          recorded && styles.legButtonRecorded,
+          disabled && styles.legButtonDisabled,
+        ]}
         onPress={recorded ? onView : onRecord}
+        disabled={disabled}
         activeOpacity={0.8}
       >
         <Text
           style={[
             styles.legButtonText,
             recorded && styles.legButtonTextRecorded,
+            disabled && styles.legButtonTextDisabled,
           ]}
         >
           {recorded ? "View" : "Record"}
@@ -60,6 +76,7 @@ type Props = {
   onViewQuestion: () => void;
   onRecordAnswer: () => void;
   onViewAnswer: () => void;
+  recordDisabled?: boolean;
 };
 
 export default function VivaRoundCard({
@@ -70,6 +87,7 @@ export default function VivaRoundCard({
   onViewQuestion,
   onRecordAnswer,
   onViewAnswer,
+  recordDisabled = false,
 }: Props) {
   return (
     <AppCard>
@@ -82,6 +100,7 @@ export default function VivaRoundCard({
         icon="videocam-outline"
         label="Accessor Question"
         recorded={hasQuestionClip}
+        recordDisabled={recordDisabled}
         onRecord={onRecordQuestion}
         onView={onViewQuestion}
       />
@@ -90,6 +109,7 @@ export default function VivaRoundCard({
         icon="person-outline"
         label="Student Answer"
         recorded={hasAnswerClip}
+        recordDisabled={recordDisabled}
         onRecord={onRecordAnswer}
         onView={onViewAnswer}
       />
@@ -136,6 +156,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#DCFCE7",
   },
 
+  legButtonDisabled: {
+    backgroundColor: Colors.border,
+  },
+
   legButtonText: {
     fontSize: Typography.caption,
     fontWeight: "700",
@@ -144,5 +168,9 @@ const styles = StyleSheet.create({
 
   legButtonTextRecorded: {
     color: "#16A34A",
+  },
+
+  legButtonTextDisabled: {
+    color: Colors.textSecondary,
   },
 });

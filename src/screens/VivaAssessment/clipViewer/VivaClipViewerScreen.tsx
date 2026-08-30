@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { useVideoPlayer, VideoView } from "expo-video";
 
 import {
@@ -14,6 +14,7 @@ import AppButton from "../../../components/common/AppButton";
 
 import { RootStackParamList } from "../../../navigation/AppNavigator";
 import { useAssessment } from "../../../context/AssessmentContext";
+import { deleteVivaEvidence } from "../../../services/assessments/assessorSubmissionsApi";
 
 import { Colors } from "../../../theme/colors";
 import { Spacing } from "../../../theme/spacing";
@@ -59,9 +60,17 @@ export default function VivaClipViewerScreen() {
       <View style={styles.row}>
         <AppButton
           title="Delete"
-          onPress={() => {
-            deleteVivaClip(studentId, roundId, speaker);
-            navigation.goBack();
+          onPress={async () => {
+            try {
+              await deleteVivaEvidence(Number(clip.id));
+              deleteVivaClip(studentId, roundId, speaker);
+              navigation.goBack();
+            } catch {
+              Alert.alert(
+                "Delete failed",
+                "Couldn't delete the viva recording. Check your connection and try again."
+              );
+            }
           }}
         />
       </View>

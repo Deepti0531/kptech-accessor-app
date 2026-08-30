@@ -12,7 +12,7 @@ import AppButton from "../../../components/common/AppButton";
 import EvidenceThumbnail from "../../../components/practical/EvidenceThumbnail";
 
 import { useAssessment } from "../../../context/AssessmentContext";
-import { students } from "../../../data/studentsData";
+import { useAssignedBatchStudents } from "../../../hooks/useAssignedBatchStudents";
 
 import { RootStackParamList } from "../../../navigation/AppNavigator";
 
@@ -33,12 +33,20 @@ export default function PracticalStudentEvidenceScreen() {
 
   const { assessment } = useAssessment();
   const { assessmentId, studentId } = route.params;
+  const {
+    students,
+    loading,
+  } = useAssignedBatchStudents(assessmentId);
 
   const student = students.find((item) => item.id === studentId);
 
   const record = assessment.practical.records.find(
     (item) => item.studentId === studentId
   );
+  const attendanceRecord = assessment.attendance.records.find(
+    (item) => item.studentId === studentId
+  );
+  const isAbsent = attendanceRecord?.status === "Absent";
 
   const evidence = record?.evidence ?? [];
 
@@ -50,13 +58,21 @@ export default function PracticalStudentEvidenceScreen() {
         contentContainerStyle={styles.container}
       >
         <Text style={styles.title}>
-          {student?.name ?? "Practical Evidence"}
+          {loading
+            ? "Loading student..."
+            : student?.name ?? "Practical Evidence"}
         </Text>
 
         <Text style={styles.subtitle}>
           {student?.rollNumber} • Add photo or video evidence of the
           practical assessment.
         </Text>
+
+        {isAbsent && (
+          <Text style={styles.absentNotice}>
+            Student is absent. Practical evidence is not required.
+          </Text>
+        )}
 
         {evidence.length === 0 ? (
           <Text style={styles.emptyText}>
@@ -85,6 +101,7 @@ export default function PracticalStudentEvidenceScreen() {
           <View style={styles.actionButton}>
             <AppButton
               title="Add Photo"
+              disabled={isAbsent}
               onPress={() =>
                 navigation.navigate("PracticalPhotoCapture", {
                   assessmentId,
@@ -97,6 +114,7 @@ export default function PracticalStudentEvidenceScreen() {
           <View style={styles.actionButton}>
             <AppButton
               title="Record Video"
+              disabled={isAbsent}
               onPress={() =>
                 navigation.navigate("PracticalVideoRecorder", {
                   assessmentId,
@@ -138,6 +156,13 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center",
     marginVertical: Spacing.xl,
+  },
+
+  absentNotice: {
+    fontSize: Typography.body,
+    color: Colors.error,
+    fontWeight: "700",
+    textAlign: "center",
   },
 
   grid: {

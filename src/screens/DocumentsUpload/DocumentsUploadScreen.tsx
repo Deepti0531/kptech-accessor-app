@@ -12,39 +12,56 @@ import { Colors } from "../../theme/colors";
 import { Spacing } from "../../theme/spacing";
 import { Typography } from "../../theme/typography";
 
-import { useNavigation } from "@react-navigation/native";
+import {
+  RouteProp,
+  useNavigation,
+  useRoute,
+} from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/AppNavigator";
+import { useAssignedBatchStudents } from "../../hooks/useAssignedBatchStudents";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type RouteProps = RouteProp<RootStackParamList, "DocumentsUpload">;
 
 export default function DocumentsUploadScreen() {
   const { assessment } = useAssessment();
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProps>();
+  const { assessmentId } = route.params;
+  const { students } = useAssignedBatchStudents(assessmentId);
+  const absentStudentIds = new Set(
+    assessment.attendance.records
+      .filter((record) => record.status === "Absent")
+      .map((record) => record.studentId)
+  );
+  const presentStudents = students.filter(
+    (student) => !absentStudentIds.has(student.id)
+  );
 
   const attendanceSheetUploaded =
     assessment.verification.attendanceSheet.photos.filter(
       (photo) => photo !== undefined
     ).length;
 
-  const evaluationSheetUploaded =
-    assessment.verification.evaluationSheet.photos.filter(
-      (photo) => photo !== undefined
-    ).length;
+  const evaluationSheetPhotos = assessment.verification.evaluationSheet.photos;
 
   const assessorDeclarationUploaded =
     assessment.verification.assessorDeclaration.photos.filter(
       (photo) => photo !== undefined
     ).length;
 
-  const attendanceSheetDone = attendanceSheetUploaded === 1;
-  const evaluationSheetDone = evaluationSheetUploaded === 1;
-  const assessorDeclarationDone = assessorDeclarationUploaded === 1;
+  const attendanceSheetDone = attendanceSheetUploaded >= 1;
+  const evaluationSheetDoneCount = presentStudents.filter((student) =>
+    evaluationSheetPhotos.some((photo) => photo?.studentId === student.id)
+  ).length;
+  const assessorDeclarationDone = assessorDeclarationUploaded >= 1;
 
   const completedCount =
     Number(attendanceSheetDone) +
-    Number(evaluationSheetDone) +
+    evaluationSheetDoneCount +
     Number(assessorDeclarationDone);
+  const totalRequired = 2 + presentStudents.length;
 
   return (
     <Screen>
@@ -79,7 +96,7 @@ export default function DocumentsUploadScreen() {
           }
           onPress={() =>
             navigation.navigate("VerificationPhotos", {
-              assessmentId: assessment.id,
+              assessmentId,
               verificationType: "attendanceSheet",
             })
           }
@@ -87,23 +104,15 @@ export default function DocumentsUploadScreen() {
 
         <VerificationItem
           title={verificationTypeConfig.evaluationSheet.title}
-          subtitle={verificationTypeConfig.evaluationSheet.subtitle}
+          subtitle={`${evaluationSheetDoneCount} / ${presentStudents.length} uploaded`}
           icon="document-text-outline"
-          completed={evaluationSheetDone}
-          completedAt={
-            assessment.verification.evaluationSheet.lastUpdated
-              ? new Date(
-                  assessment.verification.evaluationSheet.lastUpdated
-                ).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : undefined
+          completed={
+            presentStudents.length > 0 &&
+            evaluationSheetDoneCount === presentStudents.length
           }
           onPress={() =>
-            navigation.navigate("VerificationPhotos", {
-              assessmentId: assessment.id,
-              verificationType: "evaluationSheet",
+            navigation.navigate("EvaluationSheets", {
+              assessmentId,
             })
           }
         />
@@ -125,7 +134,7 @@ export default function DocumentsUploadScreen() {
           }
           onPress={() =>
             navigation.navigate("VerificationPhotos", {
-              assessmentId: assessment.id,
+              assessmentId,
               verificationType: "assessorDeclaration",
             })
           }
@@ -134,15 +143,15 @@ export default function DocumentsUploadScreen() {
         <VerificationProgress
           title="Documents Progress"
           completed={completedCount}
-          total={3}
+          total={totalRequired}
         />
 
         <AppButton
           title="Continue"
-          disabled={completedCount !== 3}
+          disabled={completedCount !== totalRequired}
           onPress={() => {
             navigation.navigate("FinalSubmission", {
-              assessmentId: assessment.id,
+              assessmentId,
             });
           }}
         />
@@ -173,4 +182,5 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 24,
   },
+
 });

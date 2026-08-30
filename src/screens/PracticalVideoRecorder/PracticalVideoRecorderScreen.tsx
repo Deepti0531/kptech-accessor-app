@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import {
   CameraView,
   useCameraPermissions,
@@ -18,6 +18,7 @@ import type { RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/AppNavigator";
 import { useAssessment } from "../../context/AssessmentContext";
+import { submitPracticalEvidence } from "../../services/assessments/assessorSubmissionsApi";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -26,15 +27,28 @@ type RouteProps = RouteProp<
   "PracticalVideoRecorder"
 >;
 
-const CHUNK_DURATION_SECONDS = 30;
+const CHUNK_DURATION_SECONDS = 15;
+const PAUSE_DURATION_SECONDS = 15;
+
+type RecordingPhase =
+  | "idle"
+  | "recording"
+  | "uploading"
+  | "paused"
+  | "manualPaused";
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export default function PracticalVideoRecorderScreen() {
   const cameraRef = useRef<CameraView>(null);
   const sessionActiveRef = useRef(false);
+  const manualPausedRef = useRef(false);
 
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { studentId } = route.params;
+  const { assessmentId, studentId } = route.params;
 
   const { addPracticalEvidence } = useAssessment();
 
@@ -44,18 +58,22 @@ export default function PracticalVideoRecorderScreen() {
     useMicrophonePermissions();
 
   const [isRecording, setIsRecording] = useState(false);
+  const [phase, setPhase] = useState<RecordingPhase>("idle");
+  const [isManuallyPaused, setIsManuallyPaused] = useState(false);
   const [chunkCount, setChunkCount] = useState(0);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [phaseSeconds, setPhaseSeconds] = useState(0);
 
   useEffect(() => {
-    if (!isRecording) return;
+    if (phase !== "recording") return;
 
     const interval = setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1);
+      setPhaseSeconds((prev) =>
+        Math.min(prev + 1, CHUNK_DURATION_SECONDS)
+      );
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isRecording]);
+  }, [phase]);
 
   useEffect(() => {
     return () => {
@@ -95,39 +113,94 @@ export default function PracticalVideoRecorderScreen() {
     );
   }
 
-  const recordNextChunk = async () => {
-    setElapsedSeconds(0);
+  const runRecordingCycle = async () => {
+    while (sessionActiveRef.current) {
+      if (manualPausedRef.current) {
+        setPhase("manualPaused");
+        setPhaseSeconds(0);
 
-    try {
-      const result = await cameraRef.current?.recordAsync({
-        maxDuration: CHUNK_DURATION_SECONDS,
-      });
-
-      if (result?.uri) {
-        addPracticalEvidence(studentId, "video", result.uri);
-        setChunkCount((prev) => prev + 1);
+        while (sessionActiveRef.current && manualPausedRef.current) {
+          await sleep(250);
+        }
       }
-    } catch (error) {
-      console.error(error);
-      sessionActiveRef.current = false;
+
+      if (!sessionActiveRef.current) break;
+
+      setPhase("recording");
+      setPhaseSeconds(0);
+
+      try {
+        const result = await cameraRef.current?.recordAsync({
+          maxDuration: CHUNK_DURATION_SECONDS,
+        });
+
+        if (result?.uri) {
+          setPhase("uploading");
+          const saved = await submitPracticalEvidence({
+            batchId: Number(assessmentId),
+            studentId: Number(studentId),
+            evidenceType: "video",
+            fileUri: result.uri,
+          });
+          addPracticalEvidence(studentId, "video", result.uri, String(saved.id));
+          setChunkCount((prev) => prev + 1);
+        }
+      } catch (error) {
+        console.error(error);
+        Alert.alert(
+          "Upload failed",
+          "Couldn't save the practical video clip. Check your connection and try again."
+        );
+        sessionActiveRef.current = false;
+      }
+
+      if (!sessionActiveRef.current) break;
+
+      if (manualPausedRef.current) continue;
+
+      setPhase("paused");
+      setPhaseSeconds(0);
+
+      for (
+        let seconds = 1;
+        seconds <= PAUSE_DURATION_SECONDS && sessionActiveRef.current;
+        seconds += 1
+      ) {
+        await sleep(1000);
+        setPhaseSeconds(seconds);
+      }
     }
 
-    if (sessionActiveRef.current) {
-      recordNextChunk();
-    } else {
-      setIsRecording(false);
-    }
+    setPhase("idle");
+    setPhaseSeconds(0);
+    manualPausedRef.current = false;
+    setIsManuallyPaused(false);
+    setIsRecording(false);
   };
 
   const handleStart = () => {
     sessionActiveRef.current = true;
+    manualPausedRef.current = false;
+    setIsManuallyPaused(false);
     setChunkCount(0);
     setIsRecording(true);
-    recordNextChunk();
+    void runRecordingCycle();
+  };
+
+  const handlePauseToggle = () => {
+    const nextPaused = !manualPausedRef.current;
+    manualPausedRef.current = nextPaused;
+    setIsManuallyPaused(nextPaused);
+
+    if (nextPaused && phase === "recording") {
+      cameraRef.current?.stopRecording();
+    }
   };
 
   const handleStop = () => {
     sessionActiveRef.current = false;
+    manualPausedRef.current = false;
+    setIsManuallyPaused(false);
     cameraRef.current?.stopRecording();
   };
 
@@ -136,9 +209,8 @@ export default function PracticalVideoRecorderScreen() {
       <Text style={styles.title}>Record Evidence Video</Text>
 
       <Text style={styles.subtitle}>
-        Recording saves automatically every {CHUNK_DURATION_SECONDS} seconds
-        as a separate evidence clip, so no single long recording is held in
-        memory.
+        Recording saves {CHUNK_DURATION_SECONDS}-second evidence clips with a{" "}
+        {PAUSE_DURATION_SECONDS}-second pause between clips.
       </Text>
 
       <CameraView
@@ -148,10 +220,26 @@ export default function PracticalVideoRecorderScreen() {
         mode="video"
       />
 
-      {isRecording && (
+      {isRecording && phase === "recording" && (
         <Text style={styles.status}>
-          ● Recording clip {chunkCount + 1} • {elapsedSeconds}s /{" "}
+          Recording clip {chunkCount + 1}: {phaseSeconds}s /{" "}
           {CHUNK_DURATION_SECONDS}s
+        </Text>
+      )}
+
+      {isRecording && phase === "uploading" && (
+        <Text style={styles.status}>Saving clip {chunkCount + 1}...</Text>
+      )}
+
+      {isRecording && phase === "paused" && (
+        <Text style={styles.pauseText}>
+          Paused before next clip: {phaseSeconds}s / {PAUSE_DURATION_SECONDS}s
+        </Text>
+      )}
+
+      {isRecording && phase === "manualPaused" && (
+        <Text style={styles.pauseText}>
+          Recording paused. Tap Resume to continue.
         </Text>
       )}
 
@@ -164,7 +252,24 @@ export default function PracticalVideoRecorderScreen() {
       {!isRecording ? (
         <AppButton title="Start Recording" onPress={handleStart} />
       ) : (
-        <AppButton title="Stop Recording" onPress={handleStop} />
+        <View style={styles.recordingActions}>
+          <View style={styles.actionButton}>
+            <AppButton
+              title={isManuallyPaused ? "Resume" : "Pause"}
+              variant="secondary"
+              disabled={phase === "uploading"}
+              onPress={handlePauseToggle}
+            />
+          </View>
+
+          <View style={styles.actionButton}>
+            <AppButton
+              title="Stop"
+              variant="danger"
+              onPress={handleStop}
+            />
+          </View>
+        </View>
       )}
 
       <View style={styles.doneButton}>
@@ -208,12 +313,29 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
 
+  pauseText: {
+    textAlign: "center",
+    color: Colors.textSecondary,
+    fontWeight: "600",
+    fontSize: Typography.body,
+    marginBottom: Spacing.md,
+  },
+
   savedText: {
     textAlign: "center",
     color: "#16A34A",
     fontWeight: "600",
     fontSize: Typography.body,
     marginBottom: Spacing.md,
+  },
+
+  recordingActions: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+  },
+
+  actionButton: {
+    flex: 1,
   },
 
   doneButton: {

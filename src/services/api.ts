@@ -6,7 +6,7 @@ import { getToken } from "./auth/services/authStorage";
 // there is no /api prefix. Override EXPO_PUBLIC_API_URL in a .env file to
 // point at a different host; this LAN IP is only a fallback for on-device dev.
 const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? "http://192.168.88.5:8000";
+  process.env.EXPO_PUBLIC_API_URL ?? "http://192.168.88.2:8000";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

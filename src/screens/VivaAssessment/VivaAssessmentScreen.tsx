@@ -1,6 +1,10 @@
 import { ScrollView, StyleSheet, Text } from "react-native";
 
-import { useNavigation } from "@react-navigation/native";
+import {
+  RouteProp,
+  useNavigation,
+  useRoute,
+} from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import Screen from "../../components/common/Screen";
@@ -9,7 +13,7 @@ import VerificationProgress from "../../components/verification/VerificationProg
 import AppButton from "../../components/common/AppButton";
 
 import { useAssessment } from "../../context/AssessmentContext";
-import { students } from "../../data/studentsData";
+import { useAssignedBatchStudents } from "../../hooks/useAssignedBatchStudents";
 
 import { RootStackParamList } from "../../navigation/AppNavigator";
 
@@ -18,19 +22,54 @@ import { Spacing } from "../../theme/spacing";
 import { Typography } from "../../theme/typography";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type RouteProps = RouteProp<RootStackParamList, "VivaAssessment">;
 
 export default function VivaAssessmentScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProps>();
   const { assessment } = useAssessment();
+  const { assessmentId } = route.params;
+  const {
+    students,
+    loading,
+    error,
+  } = useAssignedBatchStudents(assessmentId);
 
-  const studentsWithCompleteRound = assessment.viva.records.filter(
+  const studentIds = new Set(students.map((student) => student.id));
+  const records = assessment.viva.records.filter((record) =>
+    studentIds.has(record.studentId)
+  );
+  const attendanceRecords = assessment.attendance.records.filter((record) =>
+    studentIds.has(record.studentId)
+  );
+  const absentStudentIds = new Set(
+    attendanceRecords
+      .filter((record) => record.status === "Absent")
+      .map((record) => record.studentId)
+  );
+  const requiredStudentIds = students
+    .filter((student) => !absentStudentIds.has(student.id))
+    .map((student) => student.id);
+  const requiredStudentIdSet = new Set(requiredStudentIds);
+  const sortedStudents = [...students].sort((a, b) => {
+    const aAbsent = absentStudentIds.has(a.id);
+    const bAbsent = absentStudentIds.has(b.id);
+
+    if (aAbsent === bAbsent) return 0;
+    return aAbsent ? 1 : -1;
+  });
+
+  const studentsWithCompleteRound = records.filter(
     (record) =>
+      requiredStudentIdSet.has(record.studentId) &&
       record.rounds.some(
         (round) => round.questionClip && round.answerClip
       )
   ).length;
 
-  const canContinue = studentsWithCompleteRound === students.length;
+  const canContinue =
+    students.length > 0 &&
+    studentsWithCompleteRound === requiredStudentIds.length;
 
   return (
     <Screen>
@@ -47,37 +86,50 @@ export default function VivaAssessmentScreen() {
           Record each student's question and answer as a Q&A round.
         </Text>
 
-        {students.map((student) => {
-          const record = assessment.viva.records.find(
-            (item) => item.studentId === student.id
-          );
+        {loading ? (
+          <Text style={styles.emptyText}>Loading students...</Text>
+        ) : error ? (
+          <Text style={styles.emptyText}>{error}</Text>
+        ) : students.length === 0 ? (
+          <Text style={styles.emptyText}>
+            No students found for this batch.
+          </Text>
+        ) : (
+          sortedStudents.map((student) => {
+            const record = records.find(
+              (item) => item.studentId === student.id
+            );
+            const isAbsent = absentStudentIds.has(student.id);
 
-          const rounds = record?.rounds ?? [];
-          const completeRounds = rounds.filter(
-            (round) => round.questionClip && round.answerClip
-          ).length;
+            const rounds = record?.rounds ?? [];
+            const completeRounds = rounds.filter(
+              (round) => round.questionClip && round.answerClip
+            ).length;
 
-          return (
-            <StudentVivaSummaryItem
-              key={student.id}
-              name={student.name}
-              rollNumber={student.rollNumber}
-              completeRounds={completeRounds}
-              totalRounds={rounds.length}
-              onPress={() =>
-                navigation.navigate("VivaStudentRounds", {
-                  assessmentId: assessment.id,
-                  studentId: student.id,
-                })
-              }
-            />
-          );
-        })}
+            return (
+              <StudentVivaSummaryItem
+                key={student.id}
+                name={student.name}
+                rollNumber={student.rollNumber}
+                completeRounds={completeRounds}
+                totalRounds={rounds.length}
+                disabled={isAbsent}
+                disabledReason="Absent - viva not required"
+                onPress={() =>
+                  navigation.navigate("VivaStudentRounds", {
+                    assessmentId,
+                    studentId: student.id,
+                  })
+                }
+              />
+            );
+          })
+        )}
 
         <VerificationProgress
           title="Viva Assessment Progress"
           completed={studentsWithCompleteRound}
-          total={students.length}
+          total={requiredStudentIds.length}
         />
 
         <AppButton
@@ -85,7 +137,7 @@ export default function VivaAssessmentScreen() {
           disabled={!canContinue}
           onPress={() => {
             navigation.navigate("DocumentsUpload", {
-              assessmentId: assessment.id,
+              assessmentId,
             });
           }}
         />
@@ -115,5 +167,12 @@ const styles = StyleSheet.create({
     fontSize: Typography.body,
     color: Colors.textSecondary,
     lineHeight: 24,
+  },
+
+  emptyText: {
+    fontSize: Typography.body,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginVertical: Spacing.xl,
   },
 });
